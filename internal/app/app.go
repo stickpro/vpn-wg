@@ -1,7 +1,16 @@
 package app
 
-import "fmt"
+import (
+	"vpn-wg/internal/store/jsondb"
+)
 
 func Run() {
-	fmt.Println("asdasd")
+	db, err := jsondb.New("./db")
+	if err != nil {
+		panic(err)
+	}
+	if err := db.Init(); err != nil {
+		panic(err)
+	}
+
 }
