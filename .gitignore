@@ -1,0 +1,14 @@
+.idea
+.data
+.bin
+.DS_Store
+
+.env
+cover.out
+
+# Visual Studio Settings
+.vscode
+
+src
+
+*.http

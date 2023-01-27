@@ -1,0 +1,15 @@
+version: '3.5'
+
+services:
+  vpn-wg:
+    image: vpn-wg
+    container_name: vpn-wg
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    volumes:
+      - ./.bin/:/app/
+    env_file:
+      - .env
