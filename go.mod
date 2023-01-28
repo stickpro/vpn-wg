@@ -3,6 +3,7 @@ module vpn-wg
 go 1.19
 
 require (
+	github.com/gin-contrib/cors v1.4.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.8.2 // indirect
 	github.com/glendc/go-external-ip v0.1.0 // indirect
