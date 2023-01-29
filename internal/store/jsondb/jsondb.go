@@ -6,23 +6,28 @@ import (
 	"os"
 	"path"
 	"time"
+	"vpn-wg/internal/config"
 	"vpn-wg/internal/model"
 	"vpn-wg/internal/util"
 )
 
 type JsonDB struct {
-	conn   *scribble.Driver
-	dbPath string
+	conn         *scribble.Driver
+	dbPath       string
+	configServer config.ServerConfig
+	configGlobal config.GlobalConfig
 }
 
-func New(dbPath string) (*JsonDB, error) {
+func New(dbPath string, cfgServer config.ServerConfig, cfgGlobal config.GlobalConfig) (*JsonDB, error) {
 	conn, err := scribble.New(dbPath, nil)
 	if err != nil {
 		return nil, err
 	}
 	ans := JsonDB{
-		conn:   conn,
-		dbPath: dbPath,
+		conn:         conn,
+		dbPath:       dbPath,
+		configServer: cfgServer,
+		configGlobal: cfgGlobal,
 	}
 	return &ans, nil
 }
@@ -45,10 +50,10 @@ func (o *JsonDB) Init() error {
 	// server's interface
 	if _, err := os.Stat(serverInterfacePath); os.IsNotExist(err) {
 		serverInterface := new(model.ServerInterface)
-		serverInterface.Addresses = util.LookupEnvOrStrings(util.ServerAddressesEnvVar, []string{util.DefaultServerAddress})
-		serverInterface.ListenPort = util.LookupEnvOrInt(util.ServerListenPortEnvVar, util.DefaultServerPort)
-		serverInterface.PostUp = util.LookupEnvOrString(util.ServerPostUpScriptEnvVar, "")
-		serverInterface.PostDown = util.LookupEnvOrString(util.ServerPostDownScriptEnvVar, "")
+		serverInterface.Addresses = []string{o.configServer.Addresses}
+		serverInterface.ListenPort = o.configServer.Port
+		serverInterface.PostUp = o.configServer.PostUp
+		serverInterface.PostDown = o.configServer.PostDown
 		serverInterface.UpdatedAt = time.Now().UTC()
 		o.conn.Write("server", "interfaces", serverInterface)
 	}
@@ -67,7 +72,7 @@ func (o *JsonDB) Init() error {
 	}
 
 	if _, err := os.Stat(globalSettingPath); os.IsNotExist(err) {
-		endpointAddress := util.LookupEnvOrString(util.EndpointAddressEnvVar, "")
+		endpointAddress := o.configGlobal.Addresses
 
 		if endpointAddress == "" {
 			publicInterface, err := util.GetPublicIP()
@@ -79,11 +84,11 @@ func (o *JsonDB) Init() error {
 
 		globalSetting := new(model.GlobalSetting)
 		globalSetting.EndpointAddress = endpointAddress
-		globalSetting.DNSServers = util.LookupEnvOrStrings(util.DNSEnvVar, []string{util.DefaultDNS})
-		globalSetting.MTU = util.LookupEnvOrInt(util.MTUEnvVar, util.DefaultMTU)
-		globalSetting.PersistentKeepalive = util.LookupEnvOrInt(util.PersistentKeepaliveEnvVar, util.DefaultPersistentKeepalive)
-		globalSetting.ForwardMark = util.LookupEnvOrString(util.ForwardMarkEnvVar, util.DefaultForwardMark)
-		globalSetting.ConfigFilePath = util.LookupEnvOrString(util.ConfigFilePathEnvVar, util.DefaultConfigFilePath)
+		globalSetting.DNSServers = []string{o.configGlobal.DNS}
+		globalSetting.MTU = o.configGlobal.MTU
+		globalSetting.PersistentKeepalive = o.configGlobal.PersistentKeepalive
+		globalSetting.ForwardMark = o.configGlobal.ForwardMark
+		globalSetting.ConfigFilePath = o.configGlobal.ConfigFilePath
 		globalSetting.UpdatedAt = time.Now().UTC()
 		o.conn.Write("server", "global_settings", globalSetting)
 	}
