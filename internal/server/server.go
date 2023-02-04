@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"vpn-wg/internal/config"
 )
 
 type Server struct {
