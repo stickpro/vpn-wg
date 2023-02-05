@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+type Server struct {
+	KeyPair   *ServerKeypair
+	Interface *ServerInterface
+}
+
 // ServerInterface model
 type ServerInterface struct {
 	Addresses  []string  `json:"addresses"`

@@ -95,3 +95,19 @@ func (o *JsonDB) Init() error {
 
 	return nil
 }
+
+func (o *JsonDB) GetServer() (model.Server, error) {
+	server := model.Server{}
+	serverInterface := model.ServerInterface{}
+
+	if err := o.conn.Read("server", "interfaces", &serverInterface); err != nil {
+		return server, err
+	}
+	serverKeyPair := model.ServerKeypair{}
+	if err := o.conn.Read("server", "keypair", &serverKeyPair); err != nil {
+		return server, err
+	}
+	server.Interface = &serverInterface
+	server.KeyPair = &serverKeyPair
+	return server, nil
+}

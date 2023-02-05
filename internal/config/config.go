@@ -56,7 +56,7 @@ type (
 )
 
 func Init() (*Config, error) {
-	var cfg Config
+	cfg := Config{}
 	populateDefaults(cfg)
 	fmt.Println(cfg)
 	err := cleanenv.ReadEnv(&cfg.HTTP)
