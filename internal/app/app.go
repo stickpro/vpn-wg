@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"vpn-wg/internal/config"
 	"vpn-wg/internal/router"
 	"vpn-wg/internal/server"
+	"vpn-wg/internal/service"
 	"vpn-wg/internal/store/jsondb"
 )
 
@@ -31,8 +31,10 @@ func Run() {
 		panic(err)
 	}
 
-	newRouter := router.NewRouter()
-	fmt.Println("[config]", cfg.HTTP)
+	services := service.NewServices(db)
+
+	newRouter := router.NewRouter(services)
+
 	srv := server.NewServer(cfg.HTTP, newRouter.Init())
 
 	go func() {

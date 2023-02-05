@@ -5,13 +5,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"vpn-wg/internal/delivery/http/handlers"
+	"vpn-wg/internal/service"
 )
 
 type Router struct {
+	services *service.Services
 }
 
-func NewRouter() *Router {
-	return &Router{}
+func NewRouter(services *service.Services) *Router {
+	return &Router{
+		services: services,
+	}
 }
 
 func (r *Router) Init() *gin.Engine {
@@ -26,7 +30,7 @@ func (r *Router) Init() *gin.Engine {
 }
 
 func (r *Router) initApi(router *gin.Engine) {
-	handlerV1 := handlers.NewHandler()
+	handlerV1 := handlers.NewHandler(r.services)
 	api := router.Group("/api")
 	{
 		handlerV1.Init(api)
