@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"vpn-wg/internal/service"
 )
 
@@ -21,4 +22,13 @@ func (h *Handler) Init(api *gin.RouterGroup) {
 		h.initServerRoutes(v1)
 		h.initPeerRoutes(v1)
 	}
+}
+
+type response struct {
+	Message string `json:"message"`
+}
+
+func newResponse(c *gin.Context, statusCode int, message string) {
+	logrus.Error(message)
+	c.AbortWithStatusJSON(statusCode, response{message})
 }

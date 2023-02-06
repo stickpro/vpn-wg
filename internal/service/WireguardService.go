@@ -15,7 +15,7 @@ type WireguardService struct {
 }
 
 type WireguardServiceInterface interface {
-	CreateNew() (model.Peer, error)
+	CreateNew(peer model.Peer) (model.Peer, error)
 }
 
 func NewWireguardService(store store.IStore) *WireguardService {
@@ -24,8 +24,9 @@ func NewWireguardService(store store.IStore) *WireguardService {
 	}
 }
 
-func (w *WireguardService) CreateNew() (model.Peer, error) {
-	peer := model.Peer{}
+// TODO refactoring method to small function and add text message for error
+func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
+	logrus.Info("[PeersData]", peer)
 	server, err := w.store.GetServer()
 
 	if err != nil {
