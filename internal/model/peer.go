@@ -19,5 +19,13 @@ type Peer struct {
 }
 
 type PeerData struct {
-	Peers *Peer
+	Peers  *Peer
+	QRCode string
+}
+
+type QRCodeSettings struct {
+	Enabled       bool
+	IncludeDNS    bool
+	IncludeFwMark bool
+	IncludeMTU    bool
 }

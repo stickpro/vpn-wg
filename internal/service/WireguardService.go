@@ -1,7 +1,7 @@
 package service
 
 import (
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"vpn-wg/internal/model"
@@ -65,6 +65,18 @@ func (w *WireguardService) CreateNew() (model.Peer, error) {
 		if err != nil {
 			logrus.Error("Cannot verify wireguard public key: ", err)
 			return peer, err
+		}
+		// check for duplicates
+		peers, err := w.store.GetClients(false)
+		if err != nil {
+			logrus.Error("Cannot get clients for duplicate check")
+			return peer, err
+		}
+		for _, other := range peers {
+			if other.Peers.PublicKey == peer.PublicKey {
+				logrus.Error("Duplicate Public Key")
+				return peer, err
+			}
 		}
 	}
 

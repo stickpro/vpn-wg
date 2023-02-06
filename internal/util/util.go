@@ -5,6 +5,7 @@ import (
 	"fmt"
 	externalip "github.com/glendc/go-external-ip"
 	"github.com/sdomino/scribble"
+	"github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"strconv"
@@ -60,7 +61,7 @@ func GetPublicIP() (model.Interface, error) {
 	return publicInterface, err
 }
 
-func GetAllocatedIPs(ignoreClientID string) ([]string, error) {
+func GetAllocatedIPs(ignorepeerID string) ([]string, error) {
 	allocatedIPs := make([]string, 0)
 	// initialize database directory TODO change normal init
 	dir := "./db"
@@ -81,19 +82,19 @@ func GetAllocatedIPs(ignoreClientID string) ([]string, error) {
 		}
 		allocatedIPs = append(allocatedIPs, ip)
 	}
-	// read client information
-	records, err := db.ReadAll("clients")
+	// read peer information
+	records, err := db.ReadAll("peers")
 	if err != nil {
 		return nil, err
 	}
-	// append client's addresses to the result
+	// append peer's addresses to the result
 	for _, f := range records {
 		peer := model.Peer{}
 		if err := json.Unmarshal([]byte(f), &peer); err != nil {
 			return nil, err
 		}
 
-		if peer.ID != ignoreClientID {
+		if peer.ID != ignorepeerID {
 			for _, cidr := range peer.AllocatedIPs {
 				ip, err := GetIPFromCIDR(cidr)
 				if err != nil {
@@ -116,12 +117,12 @@ func GetIPFromCIDR(cidr string) (string, error) {
 }
 
 func ValidateIPAllocation(serverAddresses []string, ipAllocatedList []string, ipAllocationList []string) (bool, error) {
-	for _, clientCIDR := range ipAllocationList {
-		ip, _, _ := net.ParseCIDR(clientCIDR)
+	for _, peerCIDR := range ipAllocationList {
+		ip, _, _ := net.ParseCIDR(peerCIDR)
 
-		// clientCIDR must be in CIDR format
+		// peerCIDR must be in CIDR format
 		if ip == nil {
-			return false, fmt.Errorf("Invalid ip allocation input %s. Must be in CIDR format", clientCIDR)
+			return false, fmt.Errorf("Invalid ip allocation input %s. Must be in CIDR format", peerCIDR)
 		}
 
 		// return false immediately if the ip is already in use (in ipAllocatedList)
@@ -194,4 +195,66 @@ func ValidateExtraAllowedIPs(cidrs []string) bool {
 		return false
 	}
 	return true
+}
+
+func BuildPeerConfig(peer model.Peer, server model.Server, setting model.GlobalSetting) string {
+	// Interface section
+	peerAddress := fmt.Sprintf("Address = %s\n", strings.Join(peer.AllocatedIPs, ","))
+	peerPrivateKey := fmt.Sprintf("PrivateKey = %s\n", peer.PrivateKey)
+	peerDNS := ""
+	if peer.UseServerDNS {
+		peerDNS = fmt.Sprintf("DNS = %s\n", strings.Join(setting.DNSServers, ","))
+	}
+	peerMTU := ""
+	if setting.MTU > 0 {
+		peerMTU = fmt.Sprintf("MTU = %d\n", setting.MTU)
+	}
+
+	// Peer section
+	peerPublicKey := fmt.Sprintf("PublicKey = %s\n", server.KeyPair.PublicKey)
+	peerPresharedKey := ""
+	if peer.PresharedKey != "" {
+		peerPresharedKey = fmt.Sprintf("PresharedKey = %s\n", peer.PresharedKey)
+	}
+
+	peerAllowedIPs := fmt.Sprintf("AllowedIPs = %s\n", strings.Join(peer.AllowedIPs, ","))
+
+	desiredHost := setting.EndpointAddress
+	desiredPort := server.Interface.ListenPort
+	if strings.Contains(desiredHost, ":") {
+		split := strings.Split(desiredHost, ":")
+		desiredHost = split[0]
+		if n, err := strconv.Atoi(split[1]); err == nil {
+			desiredPort = n
+		} else {
+			logrus.Error("Endpoint appears to be incorrectly formatted: ", err)
+		}
+	}
+	peerEndpoint := fmt.Sprintf("Endpoint = %s:%d\n", desiredHost, desiredPort)
+
+	peerPersistentKeepalive := ""
+	if setting.PersistentKeepalive > 0 {
+		peerPersistentKeepalive = fmt.Sprintf("PersistentKeepalive = %d\n", setting.PersistentKeepalive)
+	}
+
+	forwardMark := ""
+	if setting.ForwardMark != "" {
+		forwardMark = fmt.Sprintf("FwMark = %s\n", setting.ForwardMark)
+	}
+
+	// build the config as string
+	strConfig := "[Interface]\n" +
+		peerAddress +
+		peerPrivateKey +
+		peerDNS +
+		peerMTU +
+		forwardMark +
+		"\n[Peer]\n" +
+		peerPublicKey +
+		peerPresharedKey +
+		peerAllowedIPs +
+		peerEndpoint +
+		peerPersistentKeepalive
+
+	return strConfig
 }

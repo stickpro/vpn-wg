@@ -29,6 +29,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sdomino/scribble v0.0.0-20200707180004-3cc68461d505 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/ugorji/go/codec v1.2.8 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
 	golang.org/x/net v0.5.0 // indirect

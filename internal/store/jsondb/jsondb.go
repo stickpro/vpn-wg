@@ -1,7 +1,11 @@
 package jsondb
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"github.com/sdomino/scribble"
+	"github.com/skip2/go-qrcode"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"os"
 	"path"
@@ -110,4 +114,47 @@ func (o *JsonDB) GetServer() (model.Server, error) {
 	server.Interface = &serverInterface
 	server.KeyPair = &serverKeyPair
 	return server, nil
+}
+
+func (o *JsonDB) GetGlobalSettings() (model.GlobalSetting, error) {
+	settings := model.GlobalSetting{}
+	return settings, o.conn.Read("server", "global_settings", &settings)
+}
+
+func (o *JsonDB) GetClients(hasQRCode bool) ([]model.PeerData, error) {
+	peers := []model.PeerData{}
+
+	records, err := o.conn.ReadAll("clients")
+	if err != nil {
+		return peers, err
+	}
+
+	// build the ClientData list
+	for _, f := range records {
+		peer := model.Peer{}
+		peersData := model.PeerData{}
+
+		// get client info
+		if err := json.Unmarshal([]byte(f), &peer); err != nil {
+			return peers, fmt.Errorf("cannot decode client json structure: %v", err)
+		}
+
+		// generate client qrcode image in base64
+		if hasQRCode && peer.PrivateKey != "" {
+			server, _ := o.GetServer()
+			globalSettings, _ := o.GetGlobalSettings()
+
+			png, err := qrcode.Encode(util.BuildPeerConfig(peer, server, globalSettings), qrcode.Medium, 256)
+			if err == nil {
+				peersData.QRCode = "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte(png))
+			} else {
+				fmt.Print("Cannot generate QR code: ", err)
+			}
+		}
+
+		peersData.Peers = &peer
+		peers = append(peers, peersData)
+	}
+
+	return peers, nil
 }
