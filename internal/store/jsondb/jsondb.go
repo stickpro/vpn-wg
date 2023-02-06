@@ -121,7 +121,7 @@ func (o *JsonDB) GetGlobalSettings() (model.GlobalSetting, error) {
 	return settings, o.conn.Read("server", "global_settings", &settings)
 }
 
-func (o *JsonDB) GetClients(hasQRCode bool) ([]model.PeerData, error) {
+func (o *JsonDB) GetPeers(hasQRCode bool) ([]model.PeerData, error) {
 	peers := []model.PeerData{}
 
 	records, err := o.conn.ReadAll("clients")
@@ -129,17 +129,15 @@ func (o *JsonDB) GetClients(hasQRCode bool) ([]model.PeerData, error) {
 		return peers, err
 	}
 
-	// build the ClientData list
 	for _, f := range records {
 		peer := model.Peer{}
 		peersData := model.PeerData{}
 
-		// get client info
 		if err := json.Unmarshal([]byte(f), &peer); err != nil {
 			return peers, fmt.Errorf("cannot decode client json structure: %v", err)
 		}
 
-		// generate client qrcode image in base64
+		// generate peer qrcode image in base64
 		if hasQRCode && peer.PrivateKey != "" {
 			server, _ := o.GetServer()
 			globalSettings, _ := o.GetGlobalSettings()
@@ -157,4 +155,8 @@ func (o *JsonDB) GetClients(hasQRCode bool) ([]model.PeerData, error) {
 	}
 
 	return peers, nil
+}
+
+func (o *JsonDB) SaveCPeer(peer model.Peer) error {
+	return o.conn.Write("clients", peer.ID, peer)
 }

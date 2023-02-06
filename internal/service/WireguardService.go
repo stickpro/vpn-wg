@@ -4,6 +4,7 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"time"
 	"vpn-wg/internal/model"
 	"vpn-wg/internal/store"
 	"vpn-wg/internal/util"
@@ -67,7 +68,7 @@ func (w *WireguardService) CreateNew() (model.Peer, error) {
 			return peer, err
 		}
 		// check for duplicates
-		peers, err := w.store.GetClients(false)
+		peers, err := w.store.GetPeers(false)
 		if err != nil {
 			logrus.Error("Cannot get clients for duplicate check")
 			return peer, err
@@ -78,6 +79,30 @@ func (w *WireguardService) CreateNew() (model.Peer, error) {
 				return peer, err
 			}
 		}
+	}
+
+	if peer.PresharedKey == "" {
+		presharedKey, err := wgtypes.GenerateKey()
+		if err != nil {
+			logrus.Error("Cannot generated preshared key: ", err)
+			return peer, err
+		}
+		peer.PresharedKey = presharedKey.String()
+	} else if peer.PresharedKey == "-" {
+		peer.PresharedKey = ""
+		logrus.Infof("skipped PresharedKey generation for user: %v", peer.Name)
+	} else {
+		_, err := wgtypes.ParseKey(peer.PresharedKey)
+		if err != nil {
+			logrus.Error("Cannot verify wireguard preshared key: ", err)
+			return peer, err
+		}
+	}
+	peer.CreatedAt = time.Now().UTC()
+	peer.UpdatedAt = peer.CreatedAt
+
+	if err := w.store.SaveCPeer(peer); err != nil {
+		return peer, err
 	}
 
 	return peer, nil
