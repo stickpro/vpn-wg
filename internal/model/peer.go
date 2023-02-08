@@ -19,7 +19,7 @@ type Peer struct {
 }
 
 type PeerData struct {
-	Peers  *Peer
+	Peer   *Peer
 	QRCode string
 }
 

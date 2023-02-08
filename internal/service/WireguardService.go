@@ -16,6 +16,7 @@ type WireguardService struct {
 
 type WireguardServiceInterface interface {
 	CreateNew(peer model.Peer) (model.Peer, error)
+	EditPeer(id string, peerValue model.Peer) (model.PeerData, error)
 }
 
 func NewWireguardService(store store.IStore) *WireguardService {
@@ -75,7 +76,7 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 			return peer, err
 		}
 		for _, other := range peers {
-			if other.Peers.PublicKey == peer.PublicKey {
+			if other.Peer.PublicKey == peer.PublicKey {
 				logrus.Error("Duplicate Public Key")
 				return peer, err
 			}
@@ -102,9 +103,33 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 	peer.CreatedAt = time.Now().UTC()
 	peer.UpdatedAt = peer.CreatedAt
 
-	if err := w.store.SaveCPeer(peer); err != nil {
+	if err := w.store.SavePeer(peer); err != nil {
 		return peer, err
 	}
 
 	return peer, nil
+}
+
+func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.PeerData, error) {
+	peerData := model.PeerData{}
+	peerData, err := w.store.GetPeerByID(id, model.QRCodeSettings{Enabled: false})
+
+	if err != nil {
+		return peerData, err
+	}
+
+	server, err := w.store.GetServer()
+	if err != nil {
+		return peerData, err
+	}
+
+	peer := *peerData.Peer
+	allocatedIPs, err := util.GetAllocatedIPs(peer.ID)
+
+	check, err := util.ValidateIPAllocation(server.Interface.Addresses, allocatedIPs, peer.AllocatedIPs)
+	if !check {
+		return peerData, err
+	}
+
+	return peerData, nil
 }

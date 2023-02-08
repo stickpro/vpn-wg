@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sdomino/scribble"
+	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"os"
@@ -150,13 +151,49 @@ func (o *JsonDB) GetPeers(hasQRCode bool) ([]model.PeerData, error) {
 			}
 		}
 
-		peersData.Peers = &peer
+		peersData.Peer = &peer
 		peers = append(peers, peersData)
 	}
 
 	return peers, nil
 }
 
-func (o *JsonDB) SaveCPeer(peer model.Peer) error {
+func (o *JsonDB) SavePeer(peer model.Peer) error {
 	return o.conn.Write("clients", peer.ID, peer)
+}
+
+func (o *JsonDB) GetPeerByID(peerID string, qrCodeSettings model.QRCodeSettings) (model.PeerData, error) {
+	peer := model.Peer{}
+	peerData := model.PeerData{}
+
+	if err := o.conn.Read("clients", peerID, &peer); err != nil {
+		logrus.Error("[Peer not found]")
+		return peerData, err
+	}
+
+	if qrCodeSettings.Enabled && peer.PrivateKey != "" {
+		server, _ := o.GetServer()
+		globalSettings, _ := o.GetGlobalSettings()
+
+		if !qrCodeSettings.IncludeDNS {
+			globalSettings.DNSServers = []string{}
+		}
+		if !qrCodeSettings.IncludeMTU {
+			globalSettings.MTU = 0
+		}
+		if !qrCodeSettings.IncludeFwMark {
+			globalSettings.ForwardMark = ""
+		}
+		png, err := qrcode.Encode(util.BuildPeerConfig(peer, server, globalSettings), qrcode.Medium, 256)
+		if err == nil {
+			peerData.QRCode = "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte(png))
+		} else {
+			fmt.Print("Cannot generate QR code: ", err)
+		}
+	}
+
+	peerData.Peer = &peer
+
+	return peerData, nil
+
 }
