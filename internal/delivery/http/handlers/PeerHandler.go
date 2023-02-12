@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"vpn-wg/internal/model"
@@ -22,7 +21,6 @@ func (h *Handler) PeerCreate(c *gin.Context) {
 }
 
 func (h *Handler) PeerEdit(c *gin.Context) {
-	fmt.Println("[id]", c)
 	id := c.Params.ByName("id")
 	peer := model.Peer{}
 
@@ -36,7 +34,16 @@ func (h *Handler) PeerEdit(c *gin.Context) {
 	} else {
 		newResponse(c, http.StatusUnprocessableEntity, err.Error())
 	}
+}
 
+func (h *Handler) PeerDelete(c *gin.Context) {
+	id := c.Params.ByName("id")
+	err := h.services.WireguardService.DeletePeer(id)
+	if err != nil {
+		newResponse(c, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	newResponse(c, http.StatusOK, "Peer removed")
 }
 
 func (h *Handler) initPeerRoutes(api *gin.RouterGroup) {
@@ -44,5 +51,6 @@ func (h *Handler) initPeerRoutes(api *gin.RouterGroup) {
 	{
 		peers.POST("", h.PeerCreate)
 		peers.PUT("/:id", h.PeerEdit)
+		peers.DELETE("/:id", h.PeerDelete)
 	}
 }

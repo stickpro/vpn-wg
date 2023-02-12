@@ -191,9 +191,12 @@ func (o *JsonDB) GetPeerByID(peerID string, qrCodeSettings model.QRCodeSettings)
 			fmt.Print("Cannot generate QR code: ", err)
 		}
 	}
-
 	peerData.Peer = &peer
 
 	return peerData, nil
+}
 
+func (o *JsonDB) DeletePeer(peerID string) error {
+	fmt.Println(peerID)
+	return o.conn.Delete("clients", peerID)
 }
