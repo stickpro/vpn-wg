@@ -111,7 +111,6 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 }
 
 func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.PeerData, error) {
-	peerData := model.PeerData{}
 	peerData, err := w.store.GetPeerByID(id, model.QRCodeSettings{Enabled: false})
 
 	if err != nil {
@@ -130,6 +129,23 @@ func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.Peer
 	if !check {
 		return peerData, err
 	}
+	if util.ValidateAllowedIPs(peer.AllowedIPs) == false {
+		logrus.Warnf("Invalid Allowed IPs input from user: %v", peer.AllowedIPs)
+		return peerData, err
+	}
+
+	peer.Name = peerValue.Name
+	peer.Email = peerValue.Email
+	peer.Enabled = peerValue.Enabled
+	peer.UseServerDNS = peerValue.UseServerDNS
+	peer.AllocatedIPs = peerValue.AllocatedIPs
+	peer.AllowedIPs = peerValue.AllowedIPs
+	peer.UpdatedAt = time.Now().UTC()
+
+	if err := w.store.SavePeer(peer); err != nil {
+		return peerData, err
+	}
+	logrus.Infof("Updated client information successfully => %v", peer)
 
 	return peerData, nil
 }
