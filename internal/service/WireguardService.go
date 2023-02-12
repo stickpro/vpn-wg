@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -17,6 +18,7 @@ type WireguardService struct {
 type WireguardServiceInterface interface {
 	CreateNew(peer model.Peer) (model.Peer, error)
 	EditPeer(id string, peerValue model.Peer) (model.PeerData, error)
+	DeletePeer(id string) error
 }
 
 func NewWireguardService(store store.IStore) *WireguardService {
@@ -148,4 +150,13 @@ func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.Peer
 	logrus.Infof("Updated client information successfully => %v", peer)
 
 	return peerData, nil
+}
+
+func (w *WireguardService) DeletePeer(id string) error {
+	fmt.Println(id)
+	if err := w.store.DeletePeer(id); err != nil {
+		logrus.Error("Cannot delete wireguard client: ", err)
+		return err
+	}
+	return nil
 }
