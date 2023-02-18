@@ -9,4 +9,5 @@ type IStore interface {
 	SavePeer(client model.Peer) error
 	GetPeerByID(peerID string, qrCode model.QRCodeSettings) (model.PeerData, error)
 	DeletePeer(peerID string) error
+	GetGlobalSettings() (model.GlobalSetting, error)
 }

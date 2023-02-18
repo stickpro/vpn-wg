@@ -5,6 +5,8 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"os"
+	"text/template"
 	"time"
 	"vpn-wg/internal/model"
 	"vpn-wg/internal/store"
@@ -19,6 +21,7 @@ type WireguardServiceInterface interface {
 	CreateNew(peer model.Peer) (model.Peer, error)
 	EditPeer(id string, peerValue model.Peer) (model.PeerData, error)
 	DeletePeer(id string) error
+	applyConfig() error
 }
 
 func NewWireguardService(store store.IStore) *WireguardService {
@@ -108,7 +111,11 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 	if err := w.store.SavePeer(peer); err != nil {
 		return peer, err
 	}
-
+	err = w.applyConfig()
+	if err != nil {
+		return model.Peer{}, err
+	}
+	fmt.Println(err)
 	return peer, nil
 }
 
@@ -158,5 +165,59 @@ func (w *WireguardService) DeletePeer(id string) error {
 		logrus.Error("Cannot delete wireguard client: ", err)
 		return err
 	}
+	return nil
+}
+
+func (w *WireguardService) applyConfig() error {
+	server, err := w.store.GetServer()
+	if err != nil {
+		logrus.Error("[Server] Cannot get server config: ")
+		return err
+	}
+	peers, err := w.store.GetPeers(false)
+	if err != nil {
+		logrus.Error("[Peers] Cannot get peers config")
+		return err
+	}
+	settings, err := w.store.GetGlobalSettings()
+	if err != nil {
+		logrus.Error("[Peers] Cannot get peers config")
+		return err
+	}
+	err = writeWireGuardServerConfig(server, peers, settings)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeWireGuardServerConfig(serverConfig model.Server, peersData []model.PeerData, globalSettings model.GlobalSetting) error {
+	var tmplWireguardConf string
+	fileContentBytes, err := os.ReadFile("./template/wg.conf")
+	if err != nil {
+		return err
+	}
+	tmplWireguardConf = string(fileContentBytes)
+	// parse the template
+	t, err := template.New("wg_config").Parse(tmplWireguardConf)
+	if err != nil {
+		return err
+	}
+	// write config file to disk
+	f, err := os.Create(globalSettings.ConfigFilePath)
+	if err != nil {
+		return err
+	}
+	config := map[string]interface{}{
+		"serverConfig":   serverConfig,
+		"peersData":      peersData,
+		"globalSettings": globalSettings,
+	}
+	err = t.Execute(f, config)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
 	return nil
 }

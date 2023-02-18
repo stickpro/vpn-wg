@@ -19,7 +19,7 @@ const (
 	defaultDNS                 = "1.1.1.1"
 	defaultMTU                 = 1450
 	defaultPersistentKeepalive = 15
-	defaultConfigFilePath      = "/etc/wireguard/wg0.conf"
+	defaultConfigFilePath      = "/home/stickpro/vpn/wg0.conf"
 	defaultForwardMark         = "0xca6c"
 )
 
