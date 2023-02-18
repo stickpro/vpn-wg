@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	externalip "github.com/glendc/go-external-ip"
 	"github.com/sdomino/scribble"
@@ -28,6 +29,14 @@ func LookupEnvOrStrings(key string, defaultVal []string) []string {
 	return defaultVal
 }
 
+func inc(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
 func LookupEnvOrInt(key string, defaultVal int) int {
 	if val, ok := os.LookupEnv(key); ok {
 		v, err := strconv.Atoi(val)
@@ -61,7 +70,7 @@ func GetPublicIP() (model.Interface, error) {
 	return publicInterface, err
 }
 
-func GetAllocatedIPs(ignorepeerID string) ([]string, error) {
+func GetAllocatedIPs(ignorePeerID string) ([]string, error) {
 	allocatedIPs := make([]string, 0)
 	// initialize database directory TODO change normal init
 	dir := "./db"
@@ -83,7 +92,7 @@ func GetAllocatedIPs(ignorepeerID string) ([]string, error) {
 		allocatedIPs = append(allocatedIPs, ip)
 	}
 	// read peer information
-	records, err := db.ReadAll("peers")
+	records, err := db.ReadAll("clients")
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +103,10 @@ func GetAllocatedIPs(ignorepeerID string) ([]string, error) {
 			return nil, err
 		}
 
-		if peer.ID != ignorepeerID {
+		if peer.ID != ignorePeerID {
 			for _, cidr := range peer.AllocatedIPs {
 				ip, err := GetIPFromCIDR(cidr)
+				fmt.Println("ip", ip)
 				if err != nil {
 					return nil, err
 				}
@@ -104,7 +114,6 @@ func GetAllocatedIPs(ignorepeerID string) ([]string, error) {
 			}
 		}
 	}
-
 	return allocatedIPs, nil
 }
 
@@ -257,4 +266,43 @@ func BuildPeerConfig(peer model.Peer, server model.Server, setting model.GlobalS
 		peerPersistentKeepalive
 
 	return strConfig
+}
+
+func GetAvailableIP(cidr string, allocatedList []string) (string, error) {
+	ip, net, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", err
+	}
+
+	broadcastAddr := GetBroadcastIP(net).String()
+	networkAddr := net.IP.String()
+
+	for ip := ip.Mask(net.Mask); net.Contains(ip); inc(ip) {
+		available := true
+		suggestedAddr := ip.String()
+		for _, allocatedAddr := range allocatedList {
+			if suggestedAddr == allocatedAddr {
+				available = false
+				break
+			}
+		}
+		if available && suggestedAddr != networkAddr && suggestedAddr != broadcastAddr {
+			return suggestedAddr, nil
+		}
+	}
+
+	return "", errors.New("no more available ip address")
+}
+
+func GetBroadcastIP(n *net.IPNet) net.IP {
+	var broadcast net.IP
+	if len(n.IP) == 4 {
+		broadcast = net.ParseIP("0.0.0.0").To4()
+	} else {
+		broadcast = net.ParseIP("::")
+	}
+	for i := 0; i < len(n.IP); i++ {
+		broadcast[i] = n.IP[i] | ^n.Mask[i]
+	}
+	return broadcast
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 	"vpn-wg/internal/model"
@@ -40,7 +41,22 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 		return peer, err
 	}
 	allocatedIPs, err := util.GetAllocatedIPs("")
+	suggestedIPs := make([]string, 0)
 
+	for _, cidr := range server.Interface.Addresses {
+		ip, err := util.GetAvailableIP(cidr, allocatedIPs)
+		if err != nil {
+			logrus.Error("Failed to get available ip from a CIDR: ", err)
+			return peer, err
+		}
+		if strings.Contains(ip, ":") {
+			suggestedIPs = append(suggestedIPs, fmt.Sprintf("%s/128", ip))
+		} else {
+			suggestedIPs = append(suggestedIPs, fmt.Sprintf("%s/32", ip))
+		}
+	}
+
+	peer.AllocatedIPs = suggestedIPs
 	check, err := util.ValidateIPAllocation(server.Interface.Addresses, allocatedIPs, peer.AllocatedIPs)
 	if !check {
 		return peer, err
