@@ -1,9 +1,11 @@
 package service
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/skip2/go-qrcode"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"os"
 	"strings"
@@ -19,7 +21,7 @@ type WireguardService struct {
 }
 
 type WireguardServiceInterface interface {
-	CreateNew(peer model.Peer) (model.Peer, error)
+	CreateNew(peer model.Peer) (model.Peer, string, error)
 	EditPeer(id string, peerValue model.Peer) (model.PeerData, error)
 	DeletePeer(id string) error
 	applyConfig() error
@@ -32,13 +34,12 @@ func NewWireguardService(store store.IStore) *WireguardService {
 }
 
 // TODO refactoring method to small function and add text message for error
-func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
-	logrus.Info("[PeersData]", peer)
+func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, string, error) {
 	server, err := w.store.GetServer()
-
+	var qrCode string
 	if err != nil {
 		logrus.Error("Cannot fetch server from database: ", err)
-		return peer, err
+		return peer, qrCode, err
 	}
 	allocatedIPs, err := util.GetAllocatedIPs("")
 	suggestedIPs := make([]string, 0)
@@ -47,7 +48,7 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 		ip, err := util.GetAvailableIP(cidr, allocatedIPs)
 		if err != nil {
 			logrus.Error("Failed to get available ip from a CIDR: ", err)
-			return peer, err
+			return peer, qrCode, err
 		}
 		if strings.Contains(ip, ":") {
 			suggestedIPs = append(suggestedIPs, fmt.Sprintf("%s/128", ip))
@@ -59,17 +60,17 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 	peer.AllocatedIPs = suggestedIPs
 	check, err := util.ValidateIPAllocation(server.Interface.Addresses, allocatedIPs, peer.AllocatedIPs)
 	if !check {
-		return peer, err
+		return peer, qrCode, err
 	}
 
 	if util.ValidateAllowedIPs(peer.AllowedIPs) == false {
 		logrus.Warnf("Invalid Allowed IPs input from user: %v", peer.AllowedIPs)
-		return peer, err
+		return peer, qrCode, err
 	}
 
 	if util.ValidateExtraAllowedIPs(peer.ExtraAllowedIPs) == false {
 		logrus.Warnf("Invalid Extra AllowedIPs input from user: %v", peer.ExtraAllowedIPs)
-		return peer, err
+		return peer, qrCode, err
 	}
 	// generate ID
 	PeerUuid := uuid.NewV4()
@@ -79,7 +80,7 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 		key, err := wgtypes.GeneratePrivateKey()
 		if err != nil {
 			logrus.Error("Cannot generate wireguard key pair: ", err)
-			return peer, err
+			return peer, qrCode, err
 		}
 		peer.PrivateKey = key.String()
 		peer.PublicKey = key.PublicKey().String()
@@ -88,18 +89,18 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 
 		if err != nil {
 			logrus.Error("Cannot verify wireguard public key: ", err)
-			return peer, err
+			return peer, qrCode, err
 		}
 		// check for duplicates
 		peers, err := w.store.GetPeers(false)
 		if err != nil {
 			logrus.Error("Cannot get clients for duplicate check")
-			return peer, err
+			return peer, qrCode, err
 		}
 		for _, other := range peers {
 			if other.Peer.PublicKey == peer.PublicKey {
 				logrus.Error("Duplicate Public Key")
-				return peer, err
+				return peer, qrCode, err
 			}
 		}
 	}
@@ -108,7 +109,7 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 		presharedKey, err := wgtypes.GenerateKey()
 		if err != nil {
 			logrus.Error("Cannot generated preshared key: ", err)
-			return peer, err
+			return peer, qrCode, err
 		}
 		peer.PresharedKey = presharedKey.String()
 	} else if peer.PresharedKey == "-" {
@@ -118,21 +119,32 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, error) {
 		_, err := wgtypes.ParseKey(peer.PresharedKey)
 		if err != nil {
 			logrus.Error("Cannot verify wireguard preshared key: ", err)
-			return peer, err
+			return peer, qrCode, err
 		}
 	}
 	peer.CreatedAt = time.Now().UTC()
 	peer.UpdatedAt = peer.CreatedAt
 
 	if err := w.store.SavePeer(peer); err != nil {
-		return peer, err
+		return peer, qrCode, err
+	}
+	settings, err := w.store.GetGlobalSettings()
+	if err != nil {
+		logrus.Error("[Peers] Cannot get peers config")
+		return peer, qrCode, err
 	}
 	err = w.applyConfig()
 	if err != nil {
-		return model.Peer{}, err
+		return model.Peer{}, qrCode, err
 	}
-	fmt.Println(err)
-	return peer, nil
+	png, err := qrcode.Encode(util.BuildPeerConfig(peer, server, settings), qrcode.Medium, 256)
+	if err == nil {
+		qrCode = "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte(png))
+	} else {
+		fmt.Print("Cannot generate QR code: ", err)
+	}
+
+	return peer, qrCode, nil
 }
 
 func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.PeerData, error) {
