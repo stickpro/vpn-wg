@@ -11,13 +11,13 @@ func (h *Handler) PeerCreate(c *gin.Context) {
 	peerData := model.PeerData{}
 
 	if err := c.ShouldBindJSON(&peerValue); err == nil {
-		peer, qrCode, err := h.services.WireguardService.CreateNew(peerValue)
+		peer, peerConfig, err := h.services.WireguardService.CreateNew(peerValue)
 		if err != nil {
 			newResponse(c, http.StatusInternalServerError, err.Error())
 			return
 		}
 		peerData.Peer = &peer
-		peerData.QRCode = qrCode
+		peerData.PeerConfig = peerConfig
 		c.JSON(http.StatusOK, peerData)
 	} else {
 		newResponse(c, http.StatusUnprocessableEntity, err.Error())

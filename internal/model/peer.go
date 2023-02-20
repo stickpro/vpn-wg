@@ -19,8 +19,9 @@ type Peer struct {
 }
 
 type PeerData struct {
-	Peer   *Peer
-	QRCode string
+	Peer       *Peer
+	QRCode     string
+	PeerConfig string
 }
 
 type QRCodeSettings struct {

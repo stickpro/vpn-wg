@@ -1,11 +1,9 @@
 package service
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/skip2/go-qrcode"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"os"
 	"strings"
@@ -137,14 +135,9 @@ func (w *WireguardService) CreateNew(peer model.Peer) (model.Peer, string, error
 	if err != nil {
 		return model.Peer{}, qrCode, err
 	}
-	png, err := qrcode.Encode(util.BuildPeerConfig(peer, server, settings), qrcode.Medium, 256)
-	if err == nil {
-		qrCode = "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte(png))
-	} else {
-		fmt.Print("Cannot generate QR code: ", err)
-	}
+	peerConfig := util.BuildPeerConfig(peer, server, settings)
 
-	return peer, qrCode, nil
+	return peer, peerConfig, nil
 }
 
 func (w *WireguardService) EditPeer(id string, peerValue model.Peer) (model.PeerData, error) {
