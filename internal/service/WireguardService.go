@@ -186,6 +186,9 @@ func (w *WireguardService) DeletePeer(id string) error {
 		logrus.Error("Cannot delete wireguard client: ", err)
 		return err
 	}
+	if err := w.applyConfig(); err != nil {
+		return err
+	}
 	return nil
 }
 
